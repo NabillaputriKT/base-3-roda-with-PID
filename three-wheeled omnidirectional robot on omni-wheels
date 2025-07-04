@@ -1,0 +1,266 @@
+#define Encoder_output_A 2 // pin2 of the Arduino
+#define Encoder_output_A1 3 // pin 3 of the Arduino
+#define lpwm1 30
+#define rpwm1 31
+#define pwm1 5
+
+#define Encoder_output_B 21 // pin2 of the Arduino
+#define Encoder_output_B1 20 // pin 3 of the Arduino
+#define lpwm2 32
+#define rpwm2 33
+#define pwm2 6
+
+#define Encoder_output_C 18 // pin2 of the Arduino
+#define Encoder_output_C1 19 // pin 3 of the Arduino
+#define lpwm3 40
+#define rpwm3 41
+#define pwm3 7
+
+volatile int Count_pulses = 0;
+const int TimeSampling = 30; //ms
+unsigned long lastTime = 0;
+
+float kp = 0.0005;//0,2
+float ki = 0.2;
+float kd = 3;
+
+int errorb = 0;
+int last_error = 0;
+int sum_error = 0;
+int motorSpeed = 0;
+
+volatile int Count_pulses2 = 0;
+const int TimeSampling2 = 30; //ms
+unsigned long lastTime2 = 0;
+
+float kp2 = 0.0005;//0,2
+float ki2 = 0.2;
+float kd2 = 3;
+
+int errorb2 = 0;
+int last_error2 = 0;
+int sum_error2 = 0;
+int motorSpeed2 = 0;
+
+volatile int Count_pulses3 = 0;
+const int TimeSampling3 = 30; //ms
+unsigned long lastTime3 = 0;
+
+float kp3 = 0.0005;//0,2
+float ki3 = 0.2;
+float kd3 = 3;
+
+int errorb3 = 0;
+int last_error3 = 0;
+int sum_error3 = 0;
+int motorSpeed3 = 0;
+
+int sp;
+int sp2;
+int sp3;
+char rx;
+void setup() {
+  Serial.begin(9600); // activates the serial communication
+  Serial2.begin (115200);
+  pinMode(lpwm1, OUTPUT);
+  pinMode(rpwm1, OUTPUT);
+  pinMode(pwm1, OUTPUT);
+  pinMode(lpwm2, OUTPUT);
+  pinMode(rpwm2, OUTPUT);
+  pinMode(pwm2, OUTPUT);
+  pinMode(lpwm3, OUTPUT);
+  pinMode(rpwm3, OUTPUT);
+  pinMode(pwm3, OUTPUT);
+
+  pinMode(Encoder_output_A, INPUT_PULLUP); // sets the Encoder_output_A pin as the input
+  pinMode(Encoder_output_A1, INPUT_PULLUP); // sets the Encoder_output_B pin as the input
+  attachInterrupt(digitalPinToInterrupt(Encoder_output_A), DC_Motor_Encoder_A, RISING);
+
+  pinMode(Encoder_output_B, INPUT_PULLUP); // sets the Encoder_output_A pin as the input
+  pinMode(Encoder_output_B1, INPUT_PULLUP); // sets the Encoder_output_B pin as the input
+  attachInterrupt(digitalPinToInterrupt(Encoder_output_B), DC_Motor_Encoder_B, RISING);
+
+  pinMode(Encoder_output_C, INPUT_PULLUP); // sets the Encoder_output_A pin as the input
+  pinMode(Encoder_output_C1, INPUT_PULLUP); // sets the Encoder_output_B pin as the input
+  attachInterrupt(digitalPinToInterrupt(Encoder_output_C), DC_Motor_Encoder_C, RISING);
+}
+
+void loop() {
+  while (Serial2.available() > 0) {
+    rx = Serial2.read ();
+    Serial.println (rx);
+    if ((rx == 'D' ) || (rx == 'H' )) {
+      Serial.println ("Maju");
+      sp = 0;
+      sp2 = 100;
+      sp3 = 100;
+      digitalWrite (lpwm1, LOW);
+      digitalWrite (rpwm1, LOW);
+
+      digitalWrite (lpwm2, HIGH);
+      digitalWrite (rpwm2, LOW);
+
+      digitalWrite (lpwm3, LOW);
+      digitalWrite (rpwm3, HIGH);
+    }
+    if ((rx == 'C' ) || (rx == 'G' )) {
+      Serial.println ("Mundur");
+      sp = 0;
+      sp2 = 100;
+      sp3 = 100;
+      digitalWrite (lpwm1, LOW);
+      digitalWrite (rpwm1, LOW);
+
+      digitalWrite (lpwm2, LOW);
+      digitalWrite (rpwm2, HIGH);
+
+      digitalWrite (lpwm3, HIGH);
+      digitalWrite (rpwm3, LOW);
+    }
+    if ((rx == 'A' ) || (rx == 'E' )) {
+      Serial.println ("Kanan");
+      sp = 100;
+      sp2 = 50;
+      sp3 = 50;
+      digitalWrite (lpwm1, LOW);
+      digitalWrite (rpwm1, HIGH);
+
+      digitalWrite (lpwm2, LOW);
+      digitalWrite (rpwm2, HIGH);
+
+      digitalWrite (lpwm3, LOW);
+      digitalWrite (rpwm3, HIGH);
+    }
+    if ((rx == 'B' ) || (rx == 'F' )) {
+      Serial.println ("Kiri");
+      sp = 100;
+      sp2 = 50;
+      sp3 = 50;
+      digitalWrite (lpwm1, HIGH);
+      digitalWrite (rpwm1, LOW);
+
+      digitalWrite (lpwm2, HIGH);
+      digitalWrite (rpwm2, LOW);
+
+      digitalWrite (lpwm3, HIGH);
+      digitalWrite (rpwm3, LOW);
+    }
+    if (rx == 'I' ) {
+      Serial.println ("STOP");
+      sp = 0;
+      sp2 = 0;
+      sp3 = 0;
+      digitalWrite (lpwm1, LOW);
+      digitalWrite (rpwm1, LOW);
+
+      digitalWrite (lpwm2, LOW);
+      digitalWrite (rpwm2, LOW);
+
+      digitalWrite (lpwm3, LOW);
+      digitalWrite (rpwm3, LOW);
+    }
+
+    ///////MOTOR 1 BEGIN///////
+    //  Serial.println("Result: ");
+    //  Serial.println(Count_pulses);
+    //  sp = 0;
+    //  digitalWrite (lpwm1, LOW);
+    //  digitalWrite (rpwm1, LOW);
+    //analogWrite (pwm1, 50);
+    unsigned long currentTime = millis();
+    float deltaTime = currentTime - lastTime;
+    if (deltaTime >= TimeSampling) {
+      float freqSignal = (float)Count_pulses / (deltaTime / 1.0e3); //(deltaTime/1.0e3) --> convert ms to s
+      float rpm = abs(freqSignal * 60.0 / 249.6); //249,6 = p*N; p=step-up gear ratio; N=pulses per revolution
+      lastTime = currentTime;
+      Count_pulses = 0;
+      errorb = sp - rpm;
+      sum_error = sum_error + errorb;
+      motorSpeed = (kp * errorb) + (ki * sum_error) + (errorb - last_error);
+      if (motorSpeed > 255) motorSpeed = 255;
+      else if (motorSpeed < 0) motorSpeed = 0;
+      analogWrite(pwm1, motorSpeed);
+      last_error = errorb;
+      //      Serial.println(rpm);
+    }
+    ///////MOTOR 1 END///////
+
+    //////MOTOR 2 BEGIN//////
+    //Serial.println("Result: ");
+    //Serial.println(Count_pulses2);
+    //  sp2 = 100;
+    //  digitalWrite (lpwm2, HIGH);
+    //  digitalWrite (rpwm2, LOW);
+    //analogWrite (pwm2, 50);
+    unsigned long currentTime2 = millis();
+    float deltaTime2 = currentTime2 - lastTime2;
+    if (deltaTime2 >= TimeSampling2) {
+      float freqSignal2 = (float)Count_pulses2 / (deltaTime2 / 1.0e3); //(deltaTime/1.0e3) --> convert ms to s
+      float rpm2 = abs(freqSignal2 * 60.0 / 249.6); //249,6 = p*N; p=step-up gear ratio; N=pulses per revolution
+      lastTime2 = currentTime2;
+      Count_pulses2 = 0;
+      errorb2 = sp2 - rpm2;
+      sum_error2 = sum_error2 + errorb2;
+      motorSpeed2 = (kp2 * errorb2) + (ki2 * sum_error2) + (errorb2 - last_error2);
+      if (motorSpeed2 > 255) motorSpeed2 = 255;
+      else if (motorSpeed2 < 0) motorSpeed2 = 0;
+      analogWrite(pwm2, motorSpeed2);
+      last_error2 = errorb2;
+      //      Serial.println(rpm2);
+    }
+    ///////MOTOR 2 END////////
+
+    ///////MOTOR 3 BEGIN///////
+    //Serial.println("Result: ");
+    //Serial.println(Count_pulses2);
+    //  sp3 = 100;
+    //  digitalWrite (lpwm3, HIGH);
+    //  digitalWrite (rpwm3, LOW);
+    //analogWrite (pwm3, 50);
+    unsigned long currentTime3 = millis();
+    float deltaTime3 = currentTime3 - lastTime3;
+    if (deltaTime3 >= TimeSampling3) {
+      float freqSignal3 = (float)Count_pulses3 / (deltaTime3 / 1.0e3); //(deltaTime/1.0e3) --> convert ms to s
+      float rpm3 = abs(freqSignal3 * 60.0 / 249.6); //249,6 = p*N; p=step-up gear ratio; N=pulses per revolution
+      lastTime3 = currentTime3;
+      Count_pulses3 = 0;
+      errorb3 = sp3 - rpm3;
+      sum_error3 = sum_error3 + errorb3;
+      motorSpeed3 = (kp3 * errorb3) + (ki3 * sum_error3) + (errorb3 - last_error3);
+      if (motorSpeed3 > 255) motorSpeed3 = 255;
+      else if (motorSpeed3 < 0) motorSpeed3 = 0;
+      analogWrite(pwm3, motorSpeed3);
+      last_error3 = errorb3;
+      //      Serial.println(rpm3);
+    }
+    //////////MOTOR 3 END//////////
+  }
+}
+
+void DC_Motor_Encoder_A() {
+  int a = digitalRead(Encoder_output_A1);
+  if (a > 0) {
+    Count_pulses++;
+  }
+  else {
+    Count_pulses--;
+  }
+}
+void DC_Motor_Encoder_B() {
+  int b = digitalRead(Encoder_output_B1);
+  if (b > 0) {
+    Count_pulses2++;
+  }
+  else {
+    Count_pulses2--;
+  }
+}
+void DC_Motor_Encoder_C() {
+  int c = digitalRead(Encoder_output_C1);
+  if (c > 0) {
+    Count_pulses3++;
+  }
+  else {
+    Count_pulses3--;
+  }
+}
